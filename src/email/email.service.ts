@@ -41,8 +41,8 @@ export class EmailService {
         }
 
         // 2. Preparar el HTML y los adjuntos
-        // Usamos el host base asumiendo un entorno local, para un entorno real usaríamos variables de entorno.
-        const baseUrl = 'http://localhost:3001';
+        // Usamos el host base definido en las variables de entorno, o caemos a localhost por defecto.
+        const baseUrl = process.env.APP_URL || 'http://localhost:3001';
 
         let attachments = [];
         let htmlEvidences = '';

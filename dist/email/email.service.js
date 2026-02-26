@@ -79,7 +79,7 @@ let EmailService = EmailService_1 = class EmailService {
         if (!pickingList) {
             throw new Error('Picking List no encontrado');
         }
-        const baseUrl = 'http://localhost:3001';
+        const baseUrl = process.env.APP_URL || 'http://localhost:3001';
         let attachments = [];
         let htmlEvidences = '';
         for (let i = 0; i < pickingList.evidences.length; i++) {
