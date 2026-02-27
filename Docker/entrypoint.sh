@@ -2,12 +2,9 @@
 
 # =======================================================
 # SCRIPT DE INICIO DE CONTENEDOR (ENTRYPOINT)
-# 1. Ejecuta migraciones de Prisma.
-# 2. Ejecuta el seeding de la base de datos.
-# 3. Inicia la aplicación principal.
+# 1. Ejecuta migraciones y seeding.
+# 2. Inicia la aplicación principal.
 # =======================================================
-
-set -e  # Salir inmediatamente si cualquier comando falla
 
 echo "⏳ Ejecutando comandos de migración y seeding..."
 
@@ -30,12 +27,12 @@ if [ $EXIT_CODE -ne 0 ]; then
   echo "$OUTPUT"
   echo "--- FIN: Salida de error de db:seed (CÓDIGO: $EXIT_CODE) ---"
   echo "❌ ERROR CRÍTICO: El seeding de la base de datos falló."
-  exit 1
+  exit 1 
 fi
 
 echo "✅ Migraciones y seeding completados. Iniciando servidor..."
 
 # --- 3. Ejecutar el comando principal de la aplicación ---
 # El comando 'exec' reemplaza el proceso de shell actual por el proceso de Node.js,
-# lo cual es crucial para la gestión de señales de Docker (SIGTERM en Cloud Run).
-exec node dist/main
+# lo cual es crucial para la gestión de señales de Docker.
+exec node dist/main.js
