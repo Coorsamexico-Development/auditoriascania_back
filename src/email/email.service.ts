@@ -11,20 +11,37 @@ export class EmailService {
 
   private async getTransporter() {
     if (!this.transporter) {
-      // Generar cuenta de prueba Ethereal automáticamente si no existe configuración
-      this.logger.log('Generando cuenta de Ethereal Email de prueba...');
-      const testAccount = await nodemailer.createTestAccount();
+      const host = process.env.MAIL_HOST;
+      const port = parseInt(process.env.MAIL_PORT ?? '587', 10);
+      const secure = process.env.MAIL_SECURE === 'true';
+      const user = process.env.MAIL_USER;
+      const pass = process.env.MAIL_PASSWORD;
 
-      this.transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false, // true for 465, false for other ports
-        auth: {
-          user: testAccount.user, // generated ethereal user
-          pass: testAccount.pass, // generated ethereal password
-        },
-      });
-      this.logger.log(`Cuenta Ethereal creada: ${testAccount.user}`);
+      if (!host || !user || !pass) {
+        this.logger.warn(
+          'Credenciales SMTP no configuradas en .env, usando cuenta Ethereal de prueba...',
+        );
+        const testAccount = await nodemailer.createTestAccount();
+
+        this.transporter = nodemailer.createTransport({
+          host: 'smtp.ethereal.email',
+          port: 587,
+          secure: false,
+          auth: {
+            user: testAccount.user,
+            pass: testAccount.pass,
+          },
+        });
+        this.logger.log(`Cuenta Ethereal creada: ${testAccount.user}`);
+      } else {
+        this.transporter = nodemailer.createTransport({
+          host,
+          port,
+          secure,
+          auth: { user, pass },
+        });
+        this.logger.log(`Transporter SMTP configurado: ${host}:${port}`);
+      }
     }
     return this.transporter;
   }
@@ -107,7 +124,9 @@ export class EmailService {
     const transporter = await this.getTransporter();
 
     const info = await transporter.sendMail({
-      from: '"Sistema Scania" <no-reply@scania-audits.test>', // sender address
+      from:
+        process.env.MAIL_FROM ??
+        '"Sistema Scania" <no-reply@scania-audits.com>',
       to: cleanTo, // list of receivers
       subject: subject || `Evidencias de Auditoría: PK-${pickingList.number}`, // Subject line
       html: htmlBody, // html body
