@@ -27,15 +27,10 @@ COPY prisma ./prisma/
 COPY Docker/entrypoint.sh ./
 RUN chmod +x ./entrypoint.sh
 
-# Instalar deps de producción + herramientas necesarias en runtime:
-# - prisma: CLI necesario para `prisma migrate deploy` en el entrypoint
-# - ts-node + typescript: necesarios para ejecutar seed.ts
-RUN npm install --omit=dev && npm install prisma ts-node typescript && \
+# Instalar solo dependencias de producción
+# Instalar prisma temporalmente para generar el cliente
+RUN npm install --omit=dev && npm install ts-node typescript && \
     npm cache clean --force
-
-# Copiar el cliente de Prisma generado (binario linux-musl) desde el builder
-# El builder genera los binarios para linux-musl-openssl-3.0.x requeridos en Alpine
-COPY --from=builder /usr/src/app/node_modules/.prisma ./node_modules/.prisma
 
 # Instalar Chromium y sus dependencias
 RUN apk add --no-cache \

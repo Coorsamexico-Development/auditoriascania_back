@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { seedUsers } from './seeders/user.seeder';
-
+import { seedUsers } from './seeders';
 const prisma: PrismaClient = new PrismaClient();
 
 async function main() {
