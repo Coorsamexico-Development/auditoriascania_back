@@ -5,3 +5,7 @@
 .env
 
 /generated/prisma
+
+# Ignore uploaded files but keep the directory (if a .gitkeep is added later)
+/uploads/*
+!/uploads/.gitkeep
