@@ -1,13 +1,12 @@
 import {
-    BadRequestException,
-    Body,
-    Controller,
-    Post,
-    UploadedFiles,
-    UseGuards,
-    UseInterceptors,
+  BadRequestException,
+  Controller,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GcsService } from '../storage/services/gcs.service';
@@ -23,35 +22,25 @@ export class EvidencesController {
 
   @Post()
   @UseInterceptors(
-    FilesInterceptor('files', 10, {
+    FileInterceptor('file', {
       storage: memoryStorage(), // Buffer en RAM → se pasa directo a GCS
     }),
   )
-  async uploadEvidences(
-    @UploadedFiles() files: Array<Express.Multer.File>,
-    @Body() body: { pickingListId: string },
-  ) {
-    if (!files || files.length === 0) {
-      throw new BadRequestException('No files uploaded');
+  async uploadEvidence(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
     }
 
-    const pickingListId = parseInt(body.pickingListId, 10);
-    if (isNaN(pickingListId)) {
-      throw new BadRequestException(
-        'pickingListId is required and must be a valid number',
-      );
-    }
+    // Subir el archivo a GCS y obtener la URL pública
+    const fileUrl = await this.gcsService.uploadFile(file, 'evidences');
 
-    // Subir cada archivo a GCS y obtener la URL pública
-    const fileUrls = await Promise.all(
-      files.map((file) => this.gcsService.uploadFile(file, 'evidences')),
-    );
-
-    await this.evidencesService.createMultiple(pickingListId, fileUrls);
+    // Guardar el registro TEMPORAL en la base de datos
+    const tempEvidence = await this.evidencesService.createTemporary(fileUrl);
 
     return {
-      message: 'Archivos subidos con éxito',
-      urls: fileUrls,
+      message: 'Evidencia temporal creada con éxito',
+      id: tempEvidence.id,
+      url: fileUrl,
     };
   }
 }
