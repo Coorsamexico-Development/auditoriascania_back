@@ -62,33 +62,38 @@ export class EmailService {
       throw new Error('Picking List no encontrado');
     }
 
-    // 2. Preparar el HTML y los adjuntos
-    // Usamos el host base definido en las variables de entorno, o caemos a localhost por defecto.
-    const baseUrl = process.env.APP_URL || 'http://localhost:3001';
 
-    const attachments = [];
+    const attachments: nodemailer.SendMailOptions['attachments'] = [];
     let htmlEvidences = '';
 
     for (let i = 0; i < pickingList.evidences.length; i++) {
       const ev = pickingList.evidences[i];
-      const url = `${baseUrl}${ev.fileUrl}`;
 
-      // Adjuntaremos la imagen con Nodemailer (descargándola desde este mismo server si fuera necesario,
-      // pero Ethereal permite links externos o podríamos adjuntar el path directamente).
-      // Como las guardamos localmente en './uploads/', podemos usar la ruta local directa para adjuntarlas.
-      const localPath = `.${ev.fileUrl}`; // Asumiendo /uploads/imagen.jpg
+      // Si la URL es de GCS (pública), se usa directamente en el HTML.
+      // Si es una ruta local legada (/uploads/...), se adjunta como antes.
+      const isGcsUrl = ev.fileUrl.startsWith('https://storage.googleapis.com');
 
-      attachments.push({
-        filename: `evidencia_${i + 1}.jpg`,
-        path: localPath,
-        cid: `evidencia_${i}`, // Referencia Content-ID para incrustar en HTML
-      });
-
-      htmlEvidences += `
+      if (isGcsUrl) {
+        // URL pública de GCS → incrustar directamente en el HTML
+        htmlEvidences += `
+                <div style="display:inline-block; margin: 10px; border: 1px solid #ddd; padding: 5px;">
+                    <img src="${ev.fileUrl}" alt="Evidencia ${i + 1}" style="max-width: 200px; max-height: 200px;"/>
+                </div>
+            `;
+      } else {
+        // Ruta local legada → adjuntar archivo (compatibilidad hacia atrás)
+        const localPath = `.${ev.fileUrl}`;
+        attachments.push({
+          filename: `evidencia_${i + 1}.jpg`,
+          path: localPath,
+          cid: `evidencia_${i}`,
+        });
+        htmlEvidences += `
                 <div style="display:inline-block; margin: 10px; border: 1px solid #ddd; padding: 5px;">
                     <img src="cid:evidencia_${i}" alt="Evidencia ${i + 1}" style="max-width: 200px; max-height: 200px;"/>
                 </div>
             `;
+      }
     }
 
     const htmlBody = `

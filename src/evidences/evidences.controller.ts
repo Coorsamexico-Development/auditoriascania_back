@@ -1,53 +1,57 @@
-import { Controller, Post, UseInterceptors, UploadedFiles, Body, UseGuards, BadRequestException } from '@nestjs/common';
+import {
+    BadRequestException,
+    Body,
+    Controller,
+    Post,
+    UploadedFiles,
+    UseGuards,
+    UseInterceptors,
+} from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { EvidencesService } from './evidences.service';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import * as fs from 'fs';
-
-// Asegurar que exista la carpeta uploads
-const uploadDir = './uploads';
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
-}
+import { GcsService } from '../storage/services/gcs.service';
+import { EvidencesService } from './evidences.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('evidences')
 export class EvidencesController {
-    constructor(private readonly evidencesService: EvidencesService) { }
+  constructor(
+    private readonly evidencesService: EvidencesService,
+    private readonly gcsService: GcsService,
+  ) {}
 
-    @Post()
-    @UseInterceptors(FilesInterceptor('files', 10, {
-        storage: diskStorage({
-            destination: uploadDir,
-            filename: (req, file, cb) => {
-                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-                const ext = extname(file.originalname);
-                cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
-            },
-        }),
-    }))
-    async uploadEvidences(
-        @UploadedFiles() files: Array<Express.Multer.File>,
-        @Body() body: { pickingListId: string }
-    ) {
-        if (!files || files.length === 0) {
-            throw new BadRequestException('No files uploaded');
-        }
-        const pickingListId = parseInt(body.pickingListId, 10);
-        if (isNaN(pickingListId)) {
-            throw new BadRequestException('pickingListId is required and must be a valid number');
-        }
-
-        // Devolvemos URLs relativas para acceder desde el frontend
-        const fileUrls = files.map(file => `/uploads/${file.filename}`);
-
-        await this.evidencesService.createMultiple(pickingListId, fileUrls);
-
-        return {
-            message: 'Archivos subidos con éxito',
-            urls: fileUrls
-        };
+  @Post()
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      storage: memoryStorage(), // Buffer en RAM → se pasa directo a GCS
+    }),
+  )
+  async uploadEvidences(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body() body: { pickingListId: string },
+  ) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files uploaded');
     }
+
+    const pickingListId = parseInt(body.pickingListId, 10);
+    if (isNaN(pickingListId)) {
+      throw new BadRequestException(
+        'pickingListId is required and must be a valid number',
+      );
+    }
+
+    // Subir cada archivo a GCS y obtener la URL pública
+    const fileUrls = await Promise.all(
+      files.map((file) => this.gcsService.uploadFile(file, 'evidences')),
+    );
+
+    await this.evidencesService.createMultiple(pickingListId, fileUrls);
+
+    return {
+      message: 'Archivos subidos con éxito',
+      urls: fileUrls,
+    };
+  }
 }
